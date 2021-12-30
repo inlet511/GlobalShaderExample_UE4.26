@@ -15,6 +15,11 @@ UE4.26 Version of GlobalShaderCreattion
 
 ## 细节变动
 
+### Build.cs
+
+PrivateDependencyModuleNames 中还要添加一个Projects，因为 IPluginManager.h现在位于Runtime/Projects目录下
+
+
 ### 去掉Serialize函数
 彻底删除这个函数，不需要了
 
@@ -34,6 +39,7 @@ TShareMap\<FGlobalShaderType\>
 	FGlobalShaderMap* GlobalShaderMap = GetGlobalShaderMap(FeatureLevel);
 
 ### GETSAFERHISHADER_VERTEX
+
 这个宏已经不存在了，直接使用XXXShader.GetXXXShader()函数代替
 旧代码：
 
@@ -67,8 +73,86 @@ GetPixelShader()已经不是GlobalShader中的函数了，要替换为：
 		ESimpleRenderTargetMode::EUninitializedColorAndDepth,
 		FExclusiveDepthStencil::DepthNop_StencilNop
 	);
-	//绘制代码……
+      //……
+      DrawIndexedPrimitiveUP…
+      RHICmdList.CopyToResolveTarget(.....
+
 
 新代码：
 
-	// TODO
+	FRHITexture2D* RenderTargetTexture = OutputRenderTargetResource->GetRenderTargetTexture();
+	RHICmdList.Transition(FRHITransitionInfo(RenderTargetTexture, ERHIAccess::SRVMask, ERHIAccess::RTV));
+	FRHIRenderPassInfo RPInfo(RenderTargetTexture, ERenderTargetActions::DontLoad_Store);
+	RHICmdList.BeginRenderPass(RPInfo, TEXT("DrawUVDisplacement"));
+	{
+
+		FGlobalShaderMap* GlobalShaderMap = GetGlobalShaderMap(FeatureLevel);
+		TShaderMapRef<FShaderTestVS> VertexShader(GlobalShaderMap);
+		TShaderMapRef<FShaderTestPS> PixelShader(GlobalShaderMap);
+
+		// Set the graphic pipeline state.  
+		FGraphicsPipelineStateInitializer GraphicsPSOInit;
+		RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
+		GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
+		GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
+		GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
+		GraphicsPSOInit.PrimitiveType = PT_TriangleList;
+		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GetVertexDeclarationFVector4();
+		GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
+		GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
+		SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
+
+		// Update viewport.
+		RHICmdList.SetViewport(
+			0, 0, 0.f,
+			OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
+		PixelShader->SetParameters(RHICmdList, MyColor);
+
+
+		RHICmdList.SetStreamSource(0, GScreenSpaceVertexBuffer.VertexBufferRHI, 0);
+		RHICmdList.DrawIndexedPrimitive(GTwoTrianglesIndexBuffer.IndexBufferRHI, 0, 0, 4, 0, 2, 1);
+	}
+
+	RHICmdList.EndRenderPass();
+	RHICmdList.Transition(FRHITransitionInfo(RenderTargetTexture, ERHIAccess::RTV, ERHIAccess::SRVMask));
+
+### DrawIndexedPrimitive函数修改
+
+旧代码
+
+	DrawIndexedPrimitiveUP(  
+        RHICmdList,  
+        PT_TriangleList,  
+        0,  
+        ARRAY_COUNT(Vertices),  
+        2,  
+        Indices,  
+        sizeof(Indices[0]),  
+        Vertices,  
+        sizeof(Vertices[0])  
+    ); 
+	
+新代码
+
+	RHICmdList.DrawIndexedPrimitive(GTwoTrianglesIndexBuffer.IndexBufferRHI, 0, 0, 4, 0, 2, 1);
+
+现在需要在RHICmdList对象上调用
+
+### Shader参数声明方式变化
+
+使用Layout Field替代旧的方式
+
+旧代码
+class FMyShaderTest : public FGlobalShader的private部分：
+
+	FShaderParameter SimpleColorVal;
+
+新代码
+
+FMyShaderTest类的开头：
+
+	DECLARE_INLINE_TYPE_LAYOUT(FMyShaderTest, NonVirtual);
+	
+private部分：
+
+	LAYOUT_FIELD(FShaderParameter, SimpleColorVal);
