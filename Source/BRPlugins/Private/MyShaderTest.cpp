@@ -19,6 +19,7 @@
 
 class FMyShaderTest : public FGlobalShader
 {
+	DECLARE_INLINE_TYPE_LAYOUT(FMyShaderTest, NonVirtual);
 public:
 
 	FMyShaderTest() {}
@@ -56,7 +57,7 @@ public:
 
 private:
 
-	FShaderParameter SimpleColorVal;
+	LAYOUT_FIELD(FShaderParameter, SimpleColorVal);
 
 };
 
@@ -163,23 +164,31 @@ static void DrawTestShaderRenderTarget_RenderThread(
 			2, 1, 3
 		};
 		//DrawPrimitiveUP(RHICmdList, PT_TriangleStrip, 2, Vertices, sizeof(Vertices[0]));  
-		DrawIndexedPrimitiveUP(
-			RHICmdList,
-			PT_TriangleList,
-			0,
-			ARRAY_COUNT(Vertices),
-			2,
-			Indices,
-			sizeof(Indices[0]),
-			Vertices,
-			sizeof(Vertices[0])
-		);
+		//DrawIndexedPrimitiveUP(
+		//	RHICmdList,
+		//	PT_TriangleList,
+		//	0,
+		//	ARRAY_COUNT(Vertices),
+		//	2,
+		//	Indices,
+		//	sizeof(Indices[0]),
+		//	Vertices,
+		//	sizeof(Vertices[0])
+		//);
+		
+		//FRHIIndexBuffer idxBuffer = FRHIIndexBuffer(3,sizeof(Indices),)
+		TResourceArray<uint16, INDEXBUFFER_ALIGNMENT> IndexBuffer;
+		uint32 NumIndices = UE_ARRAY_COUNT(Indices);
+		IndexBuffer.AddUninitialized(NumIndices);
+		FRHIResourceCreateInfo CreateInfo(&IndexBuffer);
+		FRHIIndexBuffer* idxBuffer = RHICreateIndexBuffer(sizeof(uint16), sizeof(Indices), BUF_Static, CreateInfo);
+		RHICmdList.DrawIndexedPrimitive(idxBuffer, 0, 0, sizeof(Indices[0]), 0, 2, 2);
 
-		// Resolve render target.  
-		RHICmdList.CopyToResolveTarget(
-			OutputRenderTargetResource->GetRenderTargetTexture(),
-			OutputRenderTargetResource->TextureRHI,
-			false, FResolveParams());
+		//// Resolve render target.  
+		//RHICmdList.CopyToResolveTarget(
+		//	OutputRenderTargetResource->GetRenderTargetTexture(),
+		//	OutputRenderTargetResource->TextureRHI,
+		//	false, FResolveParams());
 	}
 
 	RHICmdList.EndRenderPass();

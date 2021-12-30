@@ -1,6 +1,7 @@
 #include "/Engine/Public/Platform.ush"
 
 float4 SimpleColor;
+
 void MainVS(
  in float4 InPosition : ATTRIBUTE0,
  out float4 OutPosition : SV_POSITION

@@ -1,7 +1,9 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "BRPlugins.h"
+#include "Modules/ModuleManager.h"
 #include "Interfaces/IPluginManager.h"
+#include <ShaderCore.h>
 
 #define LOCTEXT_NAMESPACE "FBRPluginsModule"
 
