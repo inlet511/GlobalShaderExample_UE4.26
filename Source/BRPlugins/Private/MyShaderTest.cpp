@@ -115,9 +115,14 @@ static void DrawTestShaderRenderTarget_RenderThread(
 
 	FRHITexture2D* RenderTargetTexture = OutputRenderTargetResource->GetRenderTargetTexture();
 	RHICmdList.Transition(FRHITransitionInfo(RenderTargetTexture, ERHIAccess::SRVMask, ERHIAccess::RTV));
-	FRHIRenderPassInfo RPInfo(RenderTargetTexture, ERenderTargetActions::DontLoad_Store);
-	RHICmdList.BeginRenderPass(RPInfo, TEXT("DrawUVDisplacement"));
+	FRHIRenderPassInfo RPInfo(RenderTargetTexture, ERenderTargetActions::Load_Store);
+	RHICmdList.BeginRenderPass(RPInfo, TEXT("DrawColorPass"));
 	{
+
+		// SetViewport
+		RHICmdList.SetViewport(
+			0, 0, 0.f,
+			OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
 
 		FGlobalShaderMap* GlobalShaderMap = GetGlobalShaderMap(FeatureLevel);
 		TShaderMapRef<FShaderTestVS> VertexShader(GlobalShaderMap);
@@ -129,21 +134,35 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
 		GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
 		GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
-		GraphicsPSOInit.PrimitiveType = PT_TriangleList;
+		GraphicsPSOInit.PrimitiveType = PT_TriangleStrip;
 		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GetVertexDeclarationFVector4();
 		GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
 		GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
 		SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
 
 		// Update viewport.
-		RHICmdList.SetViewport(
-			0, 0, 0.f,
-			OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
+		//RHICmdList.SetViewport(
+		//	0, 0, 0.f,
+		//	OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
 		PixelShader->SetParameters(RHICmdList, MyColor);
 
+		FRHIResourceCreateInfo createInfo;
+		FVertexBufferRHIRef VertexBufferRHI = RHICreateVertexBuffer(sizeof(FVector4) * 4, BUF_Static, createInfo);
+		void* VoidPtr = RHILockVertexBuffer(VertexBufferRHI, 0, sizeof(FVector4) * 4, RLM_WriteOnly);
 
-		RHICmdList.SetStreamSource(0, GScreenSpaceVertexBuffer.VertexBufferRHI, 0);
-		RHICmdList.DrawIndexedPrimitive(GTwoTrianglesIndexBuffer.IndexBufferRHI, 0, 0, 4, 0, 2, 1);
+		FVector4* Vertices = reinterpret_cast<FVector4*>(VoidPtr);
+		Vertices[0] = FVector4(-1.0f, 1.0f, 0.0f, 1.0f);
+		Vertices[1] = FVector4(1.0f, 1.0f, 0.0f, 1.0f);
+		Vertices[2] = FVector4(-1.0f, -1.0f, 0.0f, 1.0f);
+		Vertices[3] = FVector4(1.0f, -1.0f, 0.0f, 1.0f);
+		RHIUnlockVertexBuffer(VertexBufferRHI);
+
+		RHICmdList.SetStreamSource(0, VertexBufferRHI, 0);
+		RHICmdList.DrawPrimitive(0, 2, 1);
+
+
+		//RHICmdList.SetStreamSource(0, GScreenSpaceVertexBuffer.VertexBufferRHI, 0);
+		//RHICmdList.DrawIndexedPrimitive(GTwoTrianglesIndexBuffer.IndexBufferRHI, 0, 0, 4, 0, 2, 1);
 	}
 
 	RHICmdList.EndRenderPass();

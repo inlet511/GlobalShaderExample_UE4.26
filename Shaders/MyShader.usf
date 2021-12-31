@@ -16,4 +16,6 @@ void MainPS(
     )
 {
     OutColor = SimpleColor;
+    //OutColor = float4(0, 0, 1, 1);
+
 }
