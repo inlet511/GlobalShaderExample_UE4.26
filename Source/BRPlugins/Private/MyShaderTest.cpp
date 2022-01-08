@@ -57,7 +57,6 @@ public:
 	)
 	{
 		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), SimpleColorVal, MyColor);
-
 		SetTextureParameter(RHICmdList, RHICmdList.GetBoundPixelShader(), MyTextureVal, MyTextureSamplerVal, TStaticSamplerState<SF_Trilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI(), MyTexture2D);
 	}
 
@@ -213,7 +212,7 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 	UTextureRenderTarget2D* OutputRenderTarget,
 	AActor* Ac,
 	FLinearColor MyColor,
-	UTexture* MyTexture
+	UTexture2D* MyTexture
 )
 {
 	check(IsInGameThread());
@@ -224,8 +223,9 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 	}
 
 	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
-	FRHITexture* MyRHITexture = MyTexture->TextureReference.TextureReferenceRHI->GetReferencedTexture();
-	FRHITexture2D* MyRHITexture2D = (FRHITexture2D*)MyRHITexture;
+	//MyTexture->CreateResource()
+	FRHITexture2D* MyRHITexture2D = MyTexture->TextureReference.TextureReferenceRHI->GetReferencedTexture()->GetTexture2D();
+	//FRHITexture2D* MyRHITexture2D = (FRHITexture2D*)MyRHITexture;
 	UWorld* World = Ac->GetWorld();
 	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
 	FName TextureRenderTargetName = OutputRenderTarget->GetFName();

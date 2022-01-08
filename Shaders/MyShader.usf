@@ -1,4 +1,5 @@
 #include "/Engine/Public/Platform.ush"
+#include "/Engine/Private/Common.ush"
 
 Texture2D MyTexture;
 SamplerState MyTextureSampler;
@@ -22,8 +23,15 @@ void MainPS(
     out float4 OutColor : SV_Target0
     )
 {
-    OutColor = float4(MyTexture.Sample(MyTextureSampler,UV.xy).rgb,1.0f);
+    float3 texCol = MyTexture.Sample(MyTextureSampler, UV.xy);
+    //if(texCol.x>0)
+    //{
+    //    OutColor = float4(1.0f,0,0,1.0f);
+    //}else{
+    //    OutColor = float4(0,1.0f,0,1.0f);
+    //}
+
+    OutColor = float4(Texture2DSample(MyTexture, MyTextureSampler, UV).rgb, 1.0f);
     OutColor *= SimpleColor;
-    //OutColor = float4(0, 0, 1, 1);
 
 }
