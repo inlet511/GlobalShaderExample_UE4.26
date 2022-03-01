@@ -97,8 +97,8 @@ public:
 	}
 };
 
-IMPLEMENT_SHADER_TYPE(, FShaderTestVS, TEXT("/BRPlugins/MyShader.usf"), TEXT("MainVS"), SF_Vertex)
-IMPLEMENT_SHADER_TYPE(, FShaderTestPS, TEXT("/BRPlugins/MyShader.usf"), TEXT("MainPS"), SF_Pixel)
+IMPLEMENT_SHADER_TYPE(, FShaderTestVS, TEXT("/GlobalShaderPlugin/MyShader.usf"), TEXT("MainVS"), SF_Vertex)
+IMPLEMENT_SHADER_TYPE(, FShaderTestPS, TEXT("/GlobalShaderPlugin/MyShader.usf"), TEXT("MainPS"), SF_Pixel)
 
 struct FMyVertex{
 	FVector4 Position;

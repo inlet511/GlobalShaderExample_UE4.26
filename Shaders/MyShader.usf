@@ -24,14 +24,7 @@ void MainPS(
     )
 {
     float3 texCol = MyTexture.Sample(MyTextureSampler, UV.xy);
-    //if(texCol.x>0)
-    //{
-    //    OutColor = float4(1.0f,0,0,1.0f);
-    //}else{
-    //    OutColor = float4(0,1.0f,0,1.0f);
-    //}
-
-    OutColor = float4(Texture2DSample(MyTexture, MyTextureSampler, UV).rgb, 1.0f);
-    OutColor *= SimpleColor;
+    OutColor = float4(texCol.rgb,1.0f);
+    //OutColor *= SimpleColor;
 
 }

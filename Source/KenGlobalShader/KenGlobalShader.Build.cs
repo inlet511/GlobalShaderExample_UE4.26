@@ -2,9 +2,9 @@
 
 using UnrealBuildTool;
 
-public class BRPlugins : ModuleRules
+public class KenGlobalShader : ModuleRules
 {
-	public BRPlugins(ReadOnlyTargetRules Target) : base(Target)
+	public KenGlobalShader(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		

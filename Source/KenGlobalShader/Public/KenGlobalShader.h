@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FBRPluginsModule : public IModuleInterface
+class FKenGlobalShaderModule : public IModuleInterface
 {
 public:
 
