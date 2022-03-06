@@ -5,10 +5,20 @@ UE4.26 Version of GlobalShaderCreattion
 
 且[这篇文章](https://zhuanlan.zhihu.com/p/66514192) 中提到的[Repository](https://github.com/blueroseslol/BRPlugins) 中又有过多与创建GlobalShader不相干的东西，所以我在这里参考这两篇文章及代码做了修改，使其适用于UE4.26.
 
+# 测试方法
+1. 新建C++工程
+2. 在工程内创建Plugins目录,将此插件clone至其中
+3. 编译后，创建三个资源：Render Target，材质球，和一个继承Actor的蓝图类
+4. 材质球内，将RenderTargetTexture连接到Base Color
+5. 蓝图类内，设置按下任意键，调用DrawTestShaderRenderTarget，其中Output Render Target设置为第三步创建的Render Target, My Texture设置为任意导入的贴图， My Color设置为任意颜色， WorldContextObject设置为一个self引用
+6. 将蓝图类放入关卡，并设置其接受输入
+7. 在场景中任意放置一个物体，并赋予第三步创建的材质球
+8. 运行，按下第五步设置的按键，观察物体材质的变化
+
 # GlobalShader 4.26 变动
 
 ## 整体参考
-参考引擎自带插件LensDistortion即可
+参考引擎自带插件LensDistortion(缺少传入贴图的部分)
 
 	Plugins/Compositing/LensDistortion
 
@@ -156,3 +166,17 @@ FMyShaderTest类的开头：
 private部分：
 
 	LAYOUT_FIELD(FShaderParameter, SimpleColorVal);
+	
+
+# 2022/03/06
+
+已经正常运行，可以加载出图片
+
+修改的部分：
+
+1. 之前没有正确的使用IndexBuffer，现已修改正确
+2. 之前没有成功使用DrawIndexedPrimitive，现在已经修改正确
+
+
+
+

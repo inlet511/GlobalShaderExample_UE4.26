@@ -170,38 +170,62 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
 		GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
 		GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
-		GraphicsPSOInit.PrimitiveType = PT_TriangleStrip;
+		GraphicsPSOInit.PrimitiveType = PT_TriangleList;
 		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = /*GetVertexDeclarationFVector4();*/ VertexDesc.VertexDeclarationRHI;
 		GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
 		GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
 		SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
 
+
 		PixelShader->SetParameters(RHICmdList, MyColor,MyRHITexture2D);
 		
-
+		// Vertex Buffer Begins --------------------------
 		FRHIResourceCreateInfo createInfo;
-		FVertexBufferRHIRef VertexBufferRHI = RHICreateVertexBuffer(sizeof(FMyVertex) * 4, BUF_Static, createInfo);
-		void* VoidPtr = RHILockVertexBuffer(VertexBufferRHI, 0, sizeof(FMyVertex) * 4, RLM_WriteOnly);
-
-		//FMyVertex* Vertices = reinterpret_cast<FMyVertex*>(VoidPtr);
-
+		FVertexBufferRHIRef MyVertexBufferRHI = RHICreateVertexBuffer(sizeof(FMyVertex) * 4, BUF_Static, createInfo);
+		void* VoidPtr = RHILockVertexBuffer(MyVertexBufferRHI, 0, sizeof(FMyVertex) * 4, RLM_WriteOnly);
 
 		FMyVertex v[4];
+		// LT
 		v[0].Position = FVector4(-1.0f, 1.0f, 0.0f, 1.0f);
 		v[0].UV = FVector2D(0, 1.0f);
+
+		// RT
 		v[1].Position = FVector4(1.0f, 1.0f, 0.0f, 1.0f);
 		v[1].UV = FVector2D(1.0f, 1.0f);
+
+		// LB
 		v[2].Position = FVector4(-1.0f, -1.0f, 0.0f, 1.0f);
 		v[2].UV = FVector2D(0.0f, 0.0f);
+
+		// RB
 		v[3].Position = FVector4(1.0f, -1.0f, 0.0f, 1.0f);
 		v[3].UV = FVector2D(1.0f, 0.0f);
 
 		FMemory::Memcpy(VoidPtr, &v, sizeof(FMyVertex) * 4);
+		RHIUnlockVertexBuffer(MyVertexBufferRHI);
+		// Vertex Buffer Ends --------------------------
+		
 
-		RHIUnlockVertexBuffer(VertexBufferRHI);
+		// Index Buffer Begins--------------------
+		static const uint16 Indices[6] = {
+			0,1,2,
+			2,1,3
+		};
+		
+		FRHIResourceCreateInfo IndexBufferCreateInfo;
+		FIndexBufferRHIRef MyIndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), sizeof(uint16)*6, BUF_Static,IndexBufferCreateInfo);
+		void* VoidPtr2 = RHILockIndexBuffer(MyIndexBufferRHI, 0, sizeof(uint16) * 6, RLM_WriteOnly);
+		FMemory::Memcpy(VoidPtr2, Indices, sizeof(uint16) * 6);
 
-		RHICmdList.SetStreamSource(0, VertexBufferRHI, 0);
-		RHICmdList.DrawPrimitive(0, 2, 1);
+		RHICmdList.SetStreamSource(0, MyVertexBufferRHI, 0);
+		RHIUnlockIndexBuffer(MyIndexBufferRHI);
+		// Index Buffer Ends-----------------------
+
+		// Draw Indexed
+		RHICmdList.DrawIndexedPrimitive(MyIndexBufferRHI, 0, 0, 4, 0, 2, 1);
+
+		MyIndexBufferRHI.SafeRelease();
+		MyVertexBufferRHI.SafeRelease();
 	}
 
 	RHICmdList.EndRenderPass();
@@ -209,8 +233,8 @@ static void DrawTestShaderRenderTarget_RenderThread(
 }
 
 void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
+	const UObject* WorldContextObject,
 	UTextureRenderTarget2D* OutputRenderTarget,
-	AActor* Ac,
 	FLinearColor MyColor,
 	UTexture2D* MyTexture
 )
@@ -223,10 +247,10 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 	}
 
 	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
-	//MyTexture->CreateResource()
+
 	FRHITexture2D* MyRHITexture2D = MyTexture->TextureReference.TextureReferenceRHI->GetReferencedTexture()->GetTexture2D();
-	//FRHITexture2D* MyRHITexture2D = (FRHITexture2D*)MyRHITexture;
-	UWorld* World = Ac->GetWorld();
+
+	UWorld* World = WorldContextObject->GetWorld();
 	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
 	FName TextureRenderTargetName = OutputRenderTarget->GetFName();
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
