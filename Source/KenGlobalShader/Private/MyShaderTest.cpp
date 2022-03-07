@@ -17,6 +17,15 @@
 
 #define LOCTEXT_NAMESPACE "TestShader"
 
+BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FMyUniform, )
+SHADER_PARAMETER(FVector4, ColorOne)
+SHADER_PARAMETER(FVector4, ColorTwo)
+SHADER_PARAMETER(FVector4, ColorThree)
+SHADER_PARAMETER(FVector4, ColorFour)
+SHADER_PARAMETER(uint32, ColorIndex)
+END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FMyUniform, "MyUniform");
 
 class FMyShaderTest : public FGlobalShader
 {
@@ -53,11 +62,23 @@ public:
 	void SetParameters(
 		FRHICommandListImmediate& RHICmdList,
 		const FLinearColor& MyColor,
-		FRHITexture2D* MyTexture2D
+		FRHITexture2D* MyTexture2D,
+		FMyShaderStructData& UniformData
 	)
 	{
 		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), SimpleColorVal, MyColor);
 		SetTextureParameter(RHICmdList, RHICmdList.GetBoundPixelShader(), MyTextureVal, MyTextureSamplerVal, TStaticSamplerState<SF_Trilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI(), MyTexture2D);
+
+		FMyUniform uni;
+		uni.ColorOne = UniformData.ColorOne;
+		uni.ColorTwo = UniformData.ColorTwo;
+		uni.ColorThree = UniformData.ColorThree;
+		uni.ColorFour = UniformData.ColorFour;
+		uni.ColorIndex = UniformData.ColorIndex;
+
+		TUniformBufferRef<FMyUniform> Data = TUniformBufferRef<FMyUniform>::CreateUniformBufferImmediate(uni, UniformBuffer_SingleFrame);
+		SetUniformBufferParameter(RHICmdList, RHICmdList.GetBoundPixelShader(), GetUniformBufferParameter<FMyUniform>(), Data);
+
 	}
 
 private:
@@ -131,7 +152,8 @@ static void DrawTestShaderRenderTarget_RenderThread(
 	ERHIFeatureLevel::Type FeatureLevel,
 	FName TextureRenderTargetName,
 	FLinearColor MyColor,
-	FRHITexture2D* MyRHITexture2D
+	FRHITexture2D* MyRHITexture2D,
+	FMyShaderStructData UniformData
 )
 {
 	check(IsInRenderingThread());
@@ -177,7 +199,7 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
 
 
-		PixelShader->SetParameters(RHICmdList, MyColor,MyRHITexture2D);
+		PixelShader->SetParameters(RHICmdList, MyColor,MyRHITexture2D,UniformData);
 		
 		// Vertex Buffer Begins --------------------------
 		FRHIResourceCreateInfo createInfo;
@@ -236,7 +258,8 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 	const UObject* WorldContextObject,
 	UTextureRenderTarget2D* OutputRenderTarget,
 	FLinearColor MyColor,
-	UTexture2D* MyTexture
+	UTexture2D* MyTexture,
+	FMyShaderStructData UniformData
 )
 {
 	check(IsInGameThread());
@@ -254,9 +277,9 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
 	FName TextureRenderTargetName = OutputRenderTarget->GetFName();
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
-		[TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,MyRHITexture2D](FRHICommandListImmediate& RHICmdList)
+		[TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,MyRHITexture2D, UniformData](FRHICommandListImmediate& RHICmdList)
 	{
-		DrawTestShaderRenderTarget_RenderThread(RHICmdList, TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor, MyRHITexture2D);
+		DrawTestShaderRenderTarget_RenderThread(RHICmdList, TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor, MyRHITexture2D, UniformData);
 	}
 	);
 

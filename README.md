@@ -180,3 +180,9 @@ private部分：
 
 
 
+# 2022/03/07
+
+加入了Uniform Buffer的传输
+
+## 整体参考
+参考MediaShader.cpp，相对较为“干净”的展示了Uniform Buffer的传输和使用
