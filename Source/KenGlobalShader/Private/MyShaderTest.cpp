@@ -285,4 +285,37 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 
 }
 
+
+void UTestShaderBlueprintLibrary::WriteToUTexture(UTexture2D* TargetTexture, AActor* selfref)
+{
+	check(IsInGameThread());
+
+	if (selfref == nullptr && TargetTexture == nullptr) return;
+
+	UTexture2D* Result = UTexture2D::CreateTransient(256, 256, PF_B8G8R8A8);
+
+
+	//TargetTexture->CompressionSettings = TextureCompressionSettings::TC_VectorDisplacementmap;
+	//TargetTexture->SRGB = 0;
+
+	FTexture2DMipMap& mipmap = TargetTexture->PlatformData->Mips[0];
+	uint16* MipData = reinterpret_cast<uint16*>(mipmap.BulkData.Lock(LOCK_READ_WRITE));
+	check(MipData);
+
+	int32 textureX = TargetTexture->PlatformData->SizeX;
+	int32 textureY = TargetTexture->PlatformData->SizeY;
+	TArray<FColor>colors;
+	for(int32 i = 0; i< textureX * textureY; i++)
+	{
+		colors.Add(FColor::Blue);
+	}
+
+	int32 stride = (int32)(sizeof(uint8) * 4);
+	FMemory::Memcpy(MipData, colors.GetData(), textureX * textureY * stride);
+	mipmap.BulkData.Unlock();
+
+	TargetTexture->UpdateResource();
+}
+
+
 #undef LOCTEXT_NAMESPACE  
