@@ -180,3 +180,13 @@ private部分：
 
 
 
+# 2022/03/07
+
+加入了Uniform Buffer的传输
+
+## 整体参考
+参考MediaShader.cpp，相对较为“干净”的展示了Uniform Buffer的传输和使用
+
+## 测试方法
+在之前的蓝图基础上，DrawTestShaderRenderTarget节点上增加了一个Struct的输入，只需要MakeMyShaderStructData，就可以创建一个结构体
+让不同的按键给这个Struct的ColorIndex设置为0-3的不同数值，并再次调用DrawTestShaderRenderTarget即可
