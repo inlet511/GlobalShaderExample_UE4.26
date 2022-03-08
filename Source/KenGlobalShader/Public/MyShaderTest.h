@@ -41,5 +41,11 @@ class UTestShaderBlueprintLibrary : public UBlueprintFunctionLibrary
 
 
 	UFUNCTION(BlueprintCallable, Category = "ShaderTestPlugin", meta = (WorldContext = "WorldContexObject"))
-	static void WriteToUTexture(UTexture2D* TargetTexture, AActor* selfref);
+	static bool LoadImageToTexture2D(const FString& ImagePath, UTexture2D* &InTexture, float& out_Width, float& out_Height);
+
+	UFUNCTION(BlueprintCallable, Category = "ShaderTestPlugin", meta = (WorldContext = "WorldContexObject"))
+	static void CreateAndSaveBitMap();
+
+	UFUNCTION(BlueprintCallable, Category = "ShaderTestPlugin", meta = (WorldContext = "WorldContexObject"))
+	static void CreateAndSaveUTexture();
 };

@@ -40,7 +40,9 @@ public class KenGlobalShader : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"Projects"
+				"Projects",
+				"AssetRegistry",
+				"ImageWrapper"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
