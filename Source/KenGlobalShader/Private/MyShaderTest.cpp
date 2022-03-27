@@ -336,6 +336,45 @@ bool UTestShaderBlueprintLibrary::LoadImageToTexture2D(const FString& ImagePath,
 	return false;
 }
 
+bool UTestShaderBlueprintLibrary::SaveImageFromTexture2D(UTexture2D* InTex, const FString& DesPath)
+{
+	if (!InTex)
+		return false;
+
+
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>("ImageWrapper");
+	FString extension = FPaths::GetExtension(DesPath, false);
+	EImageFormat format = EImageFormat::Invalid;
+	if (extension.Equals(TEXT("jpg"), ESearchCase::IgnoreCase) || extension.Equals(TEXT("jpeg"), ESearchCase::IgnoreCase))
+	{
+		format = EImageFormat::JPEG;
+	} else if (extension.Equals(TEXT("png"), ESearchCase::IgnoreCase))
+	{
+		format = EImageFormat::PNG;
+	}
+
+	//创建Wrapper
+	IImageWrapperPtr wrapper = ImageWrapperModule.CreateImageWrapper(format);
+
+	
+	TArray64<uint8> outData;
+	//从贴图中获取原始数据
+	InTex->Source.GetMipData(outData, 0);
+	int32 width = InTex->Source.GetSizeX();
+	int32 height = InTex->Source.GetSizeY();
+
+	int depth = (InTex->Source.GetFormat() == ETextureSourceFormat::TSF_RGBA16) ? 16 : 8;
+
+	if(wrapper.IsValid() && wrapper->SetRaw(outData.GetData(),outData.GetAllocatedSize(),width,height,ERGBFormat::BGRA,depth))
+	{
+		const TArray64<uint8> CompressedData = wrapper->GetCompressed(100);
+		FFileHelper::SaveArrayToFile(CompressedData, *DesPath);
+		return true;
+	}
+
+	return false;
+}
+
 void UTestShaderBlueprintLibrary::CreateAndSaveBitMap()
 {
 	check(IsInGameThread());
@@ -408,6 +447,8 @@ void UTestShaderBlueprintLibrary::CreateAndSaveUTexture()
 
 	delete[] Pixels;
 }
+
+
 
 
 #undef LOCTEXT_NAMESPACE  
