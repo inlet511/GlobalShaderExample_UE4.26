@@ -53,5 +53,8 @@ class UTestShaderBlueprintLibrary : public UBlueprintFunctionLibrary
 	static void CreateAndSaveUTexture();
 
 	UFUNCTION(BlueprintCallable, Category = "ImageTool")
-		static void TextureWriting(UTexture2D* TextureToBeWritten, const UObject* WorldContextObject);
+	static void TextureWriting(UTexture2D* TextureToBeWritten, const UObject* WorldContextObject);
+
+	UFUNCTION(BlueprintCallable, Category = "ImageTool")
+	static void DrawCheckerBoard(const UObject* WorldContextObject, class UTextureRenderTarget2D* OutputRenderTarget);
 };

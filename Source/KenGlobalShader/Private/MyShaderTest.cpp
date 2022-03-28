@@ -17,9 +17,8 @@
 #include "AssetRegistryModule.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
-#include "FileManager.h"
 #include "Engine/Texture2D.h"
-#include "FileHelper.h"
+#include "MyComputeShader.h"
 
 #define LOCTEXT_NAMESPACE "TestShader"
 
@@ -525,6 +524,68 @@ void UTestShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeWritten,
 				TextureToBeWritten
 			);
 		}
+	);
+}
+
+
+static void DrawCheckerBoard_RenderThread(
+	FRHICommandListImmediate& RHICmdList,
+	FTextureRenderTargetResource* TextureRenderTargetResource,
+	ERHIFeatureLevel::Type FeatureLevel
+)
+{
+	check(IsInRenderingThread());
+
+	FTexture2DRHIRef RenderTargetTexture = TextureRenderTargetResource->GetRenderTargetTexture();
+	uint32 GGroupSize = 32;
+	FIntPoint FullResolution = FIntPoint(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY());
+	uint32 GroupSizeX = FMath::DivideAndRoundUp((uint32)RenderTargetTexture->GetSizeX(), GGroupSize);
+	uint32 GroupSizeY = FMath::DivideAndRoundUp((uint32)RenderTargetTexture->GetSizeY(), GGroupSize);
+
+	TShaderMapRef<FCheckerBoardComputeShader>ComputeShader(GetGlobalShaderMap(FeatureLevel));
+	RHICmdList.SetComputeShader(ComputeShader.GetComputeShader());
+
+	FRHIResourceCreateInfo CreateInfo;
+	//Create a temp resource
+	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY(), PF_FloatRGBA, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
+	FUnorderedAccessViewRHIRef GUAV = RHICreateUnorderedAccessView(GSurfaceTexture2D);
+
+	ComputeShader->SetParameters(RHICmdList, RenderTargetTexture, GUAV);
+	DispatchComputeShader(RHICmdList, ComputeShader, GroupSizeX, GroupSizeY, 1);
+	ComputeShader->UnsetParameters(RHICmdList, GUAV);
+
+	FRHICopyTextureInfo CopyInfo;
+	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, CopyInfo);
+}
+
+
+
+void UTestShaderBlueprintLibrary::DrawCheckerBoard(const UObject* WorldContextObject, class UTextureRenderTarget2D* OutputRenderTarget)
+{
+	check(IsInGameThread());
+
+	if (!OutputRenderTarget)
+	{
+		FMessageLog("Blueprint").Warning(
+			LOCTEXT("UGraphicToolsBlueprintLibrary::DrawCheckerBoard",
+				"DrawUVDisplacementToRenderTarget: Output render target is required."));
+		return;
+	}
+
+	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
+	ERHIFeatureLevel::Type FeatureLevel = WorldContextObject->GetWorld()->Scene->GetFeatureLevel();
+
+	ENQUEUE_RENDER_COMMAND(CaptureCommand)
+		(
+			[TextureRenderTargetResource, FeatureLevel](FRHICommandListImmediate& RHICmdList)
+			{
+				DrawCheckerBoard_RenderThread
+				(
+					RHICmdList,
+					TextureRenderTargetResource,
+					FeatureLevel
+				);
+			}
 	);
 }
 
