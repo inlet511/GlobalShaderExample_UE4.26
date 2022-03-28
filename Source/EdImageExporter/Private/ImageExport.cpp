@@ -2,6 +2,8 @@
 #include <IImageWrapper.h>
 #include <IImageWrapperModule.h>
 #include <Engine/Texture.h>
+#include "Engine/Texture2D.h"
+#include "ModuleManager.h"
 
 UImageExport::UImageExport(const FObjectInitializer& Object)
 	:Super(Object)

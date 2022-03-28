@@ -8,7 +8,7 @@
 #include "PipelineStateCache.h"  
 #include "RHIStaticStates.h"  
 #include "SceneUtils.h"  
-#include "SceneInterface.h"  
+#include "SceneInterface.h"
 #include "ShaderParameterUtils.h"  
 #include "Logging/MessageLog.h"  
 #include "Internationalization/Internationalization.h"  
@@ -17,6 +17,9 @@
 #include "AssetRegistryModule.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
+#include "FileManager.h"
+#include "Engine/Texture2D.h"
+#include "FileHelper.h"
 
 #define LOCTEXT_NAMESPACE "TestShader"
 
@@ -33,6 +36,7 @@ IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FMyUniform, "MyUniform");
 class FMyShaderTest : public FGlobalShader
 {
 	DECLARE_INLINE_TYPE_LAYOUT(FMyShaderTest, NonVirtual);
+	//DECLARE_SHADER_TYPE(FMyShaderTest, Global);
 public:
 
 	FMyShaderTest() {}
@@ -354,7 +358,7 @@ bool UTestShaderBlueprintLibrary::SaveImageFromTexture2D(UTexture2D* InTex, cons
 	}
 
 	//创建Wrapper
-	IImageWrapperPtr wrapper = ImageWrapperModule.CreateImageWrapper(format);
+	TSharedPtr<IImageWrapper> wrapper = ImageWrapperModule.CreateImageWrapper(format);
 
 	
 	TArray64<uint8> outData;
@@ -399,7 +403,7 @@ void UTestShaderBlueprintLibrary::CreateAndSaveUTexture()
 	FString TextureName = TEXT("AutoGen");
 	FString PackageName = TEXT("/Game/ProceduralTextures/");
 	PackageName += TextureName;
-	UPackage* Package = CreatePackage(NULL, *PackageName);
+	UPackage* Package = CreatePackage(*PackageName);
 	Package->FullyLoad();
 
 	UTexture2D* NewTexture = NewObject<UTexture2D>(Package, *TextureName, RF_Public | RF_Standalone | RF_MarkAsRootSet);
@@ -449,6 +453,79 @@ void UTestShaderBlueprintLibrary::CreateAndSaveUTexture()
 }
 
 
+static void TextureWriting_RenderThread(
+	FRHICommandListImmediate& RHICmdList,
+	ERHIFeatureLevel::Type FeatureLevel,
+	UTexture2D* Texture
+)
+{
+	check(IsInRenderingThread());
+	if (Texture == nullptr)
+	{
+		return;
+	}
 
+	// 注意这里的三步转换，从UTexture2D转换到FRHITexture2D
+	FTextureReferenceRHIRef MyTextureRHI = Texture->TextureReference.TextureReferenceRHI;
+	FRHITexture* TexRef = MyTextureRHI->GetTextureReference()->GetReferencedTexture();
+	FRHITexture2D* TexRef2D = (FRHITexture2D*)TexRef;
+
+
+	TArray<FColor> Bitmap;
+	uint32 LolStride = 0;
+	char* TextureDataPtr = (char*)RHICmdList.LockTexture2D(TexRef2D, 0, EResourceLockMode::RLM_ReadOnly, LolStride, false);
+
+	for (uint32 Row = 0; Row < TexRef2D->GetSizeY(); ++Row)
+	{
+		uint32* PixelPtr = (uint32*)TextureDataPtr;
+		for (uint32 Col = 0; Col < TexRef2D->GetSizeX(); ++Col)
+		{
+			uint32 EncodedPixel = *PixelPtr;
+			uint8 r = (EncodedPixel & 0x000000FF);
+			uint8 g = (EncodedPixel & 0x0000FF00) >> 8;
+			uint8 b = (EncodedPixel & 0x00FF0000) >> 16;
+			uint8 a = (EncodedPixel & 0xFF000000) >> 24;
+			FColor col = FColor(r, g, b, a);
+			Bitmap.Add(FColor(b, g, r, a));
+			PixelPtr++;
+		}
+		// move to next row:
+		TextureDataPtr += LolStride;
+	}
+	RHICmdList.UnlockTexture2D(TexRef2D, 0, false);
+
+	if (Bitmap.Num())
+	{
+		IFileManager::Get().MakeDirectory(*FPaths::ScreenShotDir(), true);
+		const FString ScreenFileName(FPaths::ScreenShotDir() / TEXT("VisualizeTexture"));
+		uint32 ExtendXWithMSAA = Bitmap.Num() / Texture->GetSizeY() == 0? 1 : Texture->GetSizeY();
+		// Save the contents of the array to a bitmap file. (24bit only so alpha channel is dropped)
+		FFileHelper::CreateBitmap(*ScreenFileName, ExtendXWithMSAA, Texture->GetSizeY(), Bitmap.GetData());
+		UE_LOG(LogConsoleResponse, Display, TEXT("Content was saved to \"%s\""), *FPaths::ScreenShotDir());
+	} else
+	{
+		UE_LOG(LogConsoleResponse, Error, TEXT("Failed to save BMP, format or texture type is not supported"));
+	}
+}
+
+void UTestShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeWritten,const UObject* WorldContextObject)
+{
+	check(IsInGameThread());
+
+	UWorld* World = WorldContextObject->GetWorld();
+	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
+
+	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
+		[FeatureLevel, TextureToBeWritten](FRHICommandListImmediate& RHICmdList)
+		{
+			TextureWriting_RenderThread
+			(
+				RHICmdList,
+				FeatureLevel,
+				TextureToBeWritten
+			);
+		}
+	);
+}
 
 #undef LOCTEXT_NAMESPACE  
