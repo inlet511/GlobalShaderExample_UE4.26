@@ -553,7 +553,7 @@ static void DrawCheckerBoard_RenderThread(
 	
 	ComputeShader->SetParameters(RHICmdList, RenderTargetTexture, GUAV);
 
-	FRHITransitionInfo UAVTransition(GUAV, ERHIAccess::Unknown, ERHIAccess::ERWBarrier);
+	FRHITransitionInfo UAVTransition(GUAV, ERHIAccess::Unknown, ERHIAccess::UAVCompute);
 	const FRHITransition* GFxToAsyncTransition = RHICreateTransition(ERHIPipeline::Graphics, ERHIPipeline::AsyncCompute, ERHICreateTransitionFlags::None, MakeArrayView(&UAVTransition, 1));
 
 	RHICmdList.BeginTransition(GFxToAsyncTransition);
