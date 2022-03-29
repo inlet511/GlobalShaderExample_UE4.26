@@ -275,8 +275,10 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 		return;
 	}
 
+	// 向渲染线程传输RenderTarget的方法
 	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
 
+	// 向渲染线程传输FRHITexture2D的方法
 	FRHITexture2D* MyRHITexture2D = MyTexture->TextureReference.TextureReferenceRHI->GetReferencedTexture()->GetTexture2D();
 
 	UWorld* World = WorldContextObject->GetWorld();
@@ -464,20 +466,18 @@ static void TextureWriting_RenderThread(
 		return;
 	}
 
-	// 注意这里的三步转换，从UTexture2D转换到FRHITexture2D
-	FTextureReferenceRHIRef MyTextureRHI = Texture->TextureReference.TextureReferenceRHI;
-	FRHITexture* TexRef = MyTextureRHI->GetTextureReference()->GetReferencedTexture();
-	FRHITexture2D* TexRef2D = (FRHITexture2D*)TexRef;
+	// 向渲染线程传输FRHITexture2D的方法
+	FRHITexture2D* MyRHITexture2D = Texture->TextureReference.TextureReferenceRHI->GetReferencedTexture()->GetTexture2D();
 
 
 	TArray<FColor> Bitmap;
 	uint32 LolStride = 0;
-	char* TextureDataPtr = (char*)RHICmdList.LockTexture2D(TexRef2D, 0, EResourceLockMode::RLM_ReadOnly, LolStride, false);
+	char* TextureDataPtr = (char*)RHICmdList.LockTexture2D(MyRHITexture2D, 0, EResourceLockMode::RLM_ReadOnly, LolStride, false);
 
-	for (uint32 Row = 0; Row < TexRef2D->GetSizeY(); ++Row)
+	for (uint32 Row = 0; Row < MyRHITexture2D->GetSizeY(); ++Row)
 	{
 		uint32* PixelPtr = (uint32*)TextureDataPtr;
-		for (uint32 Col = 0; Col < TexRef2D->GetSizeX(); ++Col)
+		for (uint32 Col = 0; Col < MyRHITexture2D->GetSizeX(); ++Col)
 		{
 			uint32 EncodedPixel = *PixelPtr;
 			uint8 r = (EncodedPixel & 0x000000FF);
@@ -491,7 +491,7 @@ static void TextureWriting_RenderThread(
 		// move to next row:
 		TextureDataPtr += LolStride;
 	}
-	RHICmdList.UnlockTexture2D(TexRef2D, 0, false);
+	RHICmdList.UnlockTexture2D(MyRHITexture2D, 0, false);
 
 	if (Bitmap.Num())
 	{
@@ -528,6 +528,8 @@ void UTestShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeWritten,
 }
 
 
+
+
 static void DrawCheckerBoard_RenderThread(
 	FRHICommandListImmediate& RHICmdList,
 	FTextureRenderTargetResource* TextureRenderTargetResource,
@@ -547,7 +549,7 @@ static void DrawCheckerBoard_RenderThread(
 
 	FRHIResourceCreateInfo CreateInfo;
 	//Create a temp resource
-	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY(), PF_FloatRGBA, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
+	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY(), PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
 	FUnorderedAccessViewRHIRef GUAV = RHICreateUnorderedAccessView(GSurfaceTexture2D);
 
 	
@@ -557,19 +559,20 @@ static void DrawCheckerBoard_RenderThread(
 	const FRHITransition* GFxToAsyncTransition = RHICreateTransition(ERHIPipeline::Graphics, ERHIPipeline::AsyncCompute, ERHICreateTransitionFlags::None, MakeArrayView(&UAVTransition, 1));
 
 	RHICmdList.BeginTransition(GFxToAsyncTransition);
-
 	FRHIAsyncComputeCommandListImmediate& RHICmdListComputeImmediate = FRHICommandListExecutor::GetImmediateAsyncComputeCommandList();	
-
 	DispatchComputeShader(RHICmdList, ComputeShader, GroupSizeX, GroupSizeY, 1);
 	RHICmdListComputeImmediate.EndTransition(GFxToAsyncTransition);
 
+	//使用前面Compute Shader 生成的图片输入到下一个阶段使用
 	FRHICopyTextureInfo CopyInfo;
 	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, CopyInfo);
 }
 
 
 
-void UTestShaderBlueprintLibrary::DrawCheckerBoard(const UObject* WorldContextObject, class UTextureRenderTarget2D* OutputRenderTarget)
+void UTestShaderBlueprintLibrary::DrawCheckerBoard(
+	const UObject* WorldContextObject, 
+	class UTextureRenderTarget2D* OutputRenderTarget)
 {
 	check(IsInGameThread());
 
@@ -583,6 +586,7 @@ void UTestShaderBlueprintLibrary::DrawCheckerBoard(const UObject* WorldContextOb
 
 	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
 	ERHIFeatureLevel::Type FeatureLevel = WorldContextObject->GetWorld()->Scene->GetFeatureLevel();
+
 
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)
 		(
