@@ -550,9 +550,18 @@ static void DrawCheckerBoard_RenderThread(
 	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY(), PF_FloatRGBA, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
 	FUnorderedAccessViewRHIRef GUAV = RHICreateUnorderedAccessView(GSurfaceTexture2D);
 
+	
 	ComputeShader->SetParameters(RHICmdList, RenderTargetTexture, GUAV);
+
+	FRHITransitionInfo UAVTransition(GUAV, ERHIAccess::Unknown, ERHIAccess::ERWBarrier);
+	const FRHITransition* GFxToAsyncTransition = RHICreateTransition(ERHIPipeline::Graphics, ERHIPipeline::AsyncCompute, ERHICreateTransitionFlags::None, MakeArrayView(&UAVTransition, 1));
+
+	RHICmdList.BeginTransition(GFxToAsyncTransition);
+
+	FRHIAsyncComputeCommandListImmediate& RHICmdListComputeImmediate = FRHICommandListExecutor::GetImmediateAsyncComputeCommandList();	
+
 	DispatchComputeShader(RHICmdList, ComputeShader, GroupSizeX, GroupSizeY, 1);
-	ComputeShader->UnsetParameters(RHICmdList, GUAV);
+	RHICmdListComputeImmediate.EndTransition(GFxToAsyncTransition);
 
 	FRHICopyTextureInfo CopyInfo;
 	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, CopyInfo);

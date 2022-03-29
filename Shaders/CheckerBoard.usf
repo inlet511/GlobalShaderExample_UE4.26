@@ -4,9 +4,9 @@ RWTexture2D<float4> RWOutputSurface;
 
 [numthreads(32,32,1)]
 void MainCS(
-	uint3 GroupId: SV_GruopID,
+	uint3 GroupId: SV_GroupID,
 	uint3 DispatchThreadId : SV_DispatchThreadID,
 	uint3 GroupThreadId : SV_GroupThreadID)
 {
-		RWOutputSurface[DispatchThreadId.xy] = float4(1,0,0,1);
+    RWOutputSurface[DispatchThreadId.xy] = float4(float(GroupThreadId.x) / float(32), float(GroupThreadId.y) / float(32), 0, 1);
 }
