@@ -24,6 +24,8 @@ void MainPS(
     )
 {
     OutColor = MyTexture.Sample(MyTextureSampler, UV.xy);
+
+    
     switch(MyUniform.ColorIndex)
     {
         case 0:

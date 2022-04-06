@@ -19,6 +19,7 @@
 #include "IImageWrapper.h"
 #include "Engine/Texture2D.h"
 #include "MyComputeShader.h"
+#include <RHI.h>
 
 #define LOCTEXT_NAMESPACE "TestShader"
 
@@ -533,7 +534,8 @@ void UTestShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeWritten,
 static void DrawCheckerBoard_RenderThread(
 	FRHICommandListImmediate& RHICmdList,
 	FTextureRenderTargetResource* TextureRenderTargetResource,
-	ERHIFeatureLevel::Type FeatureLevel
+	ERHIFeatureLevel::Type FeatureLevel,
+	FMyShaderStructData UniformData
 )
 {
 	check(IsInRenderingThread());
@@ -547,12 +549,12 @@ static void DrawCheckerBoard_RenderThread(
 	TShaderMapRef<FCheckerBoardComputeShader>ComputeShader(GetGlobalShaderMap(FeatureLevel));
 	RHICmdList.SetComputeShader(ComputeShader.GetComputeShader());
 
+
+	//创建一个贴图资源和UAV视图 —— 和 RenderTargetTexture无关，这里只是用到了后者尺寸
 	FRHIResourceCreateInfo CreateInfo;
-	//Create a temp resource
 	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY(), PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
 	FUnorderedAccessViewRHIRef GUAV = RHICreateUnorderedAccessView(GSurfaceTexture2D);
 
-	
 	ComputeShader->SetParameters(RHICmdList, RenderTargetTexture, GUAV);
 
 	FRHITransitionInfo UAVTransition(GUAV, ERHIAccess::Unknown, ERHIAccess::UAVCompute);
@@ -563,16 +565,21 @@ static void DrawCheckerBoard_RenderThread(
 	DispatchComputeShader(RHICmdList, ComputeShader, GroupSizeX, GroupSizeY, 1);
 	RHICmdListComputeImmediate.EndTransition(GFxToAsyncTransition);
 
-	//使用前面Compute Shader 生成的图片输入到下一个阶段使用
-	FRHICopyTextureInfo CopyInfo;
-	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, CopyInfo);
+	//把CS输出的UAV贴图拷贝回RenderTargetTexture
+	/*FRHICopyTextureInfo CopyInfo;
+	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, CopyInfo);*/
+
+	// 下一个渲染函数使用上面生成的贴图
+	DrawTestShaderRenderTarget_RenderThread(RHICmdList, TextureRenderTargetResource, FeatureLevel, FName(), FColor::Red, GSurfaceTexture2D, UniformData);
 }
 
 
 
 void UTestShaderBlueprintLibrary::DrawCheckerBoard(
 	const UObject* WorldContextObject, 
-	class UTextureRenderTarget2D* OutputRenderTarget)
+	class UTextureRenderTarget2D* OutputRenderTarget,
+	FMyShaderStructData UniformData
+	)
 {
 	check(IsInGameThread());
 
@@ -590,13 +597,14 @@ void UTestShaderBlueprintLibrary::DrawCheckerBoard(
 
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)
 		(
-			[TextureRenderTargetResource, FeatureLevel](FRHICommandListImmediate& RHICmdList)
+			[TextureRenderTargetResource, FeatureLevel,UniformData](FRHICommandListImmediate& RHICmdList)
 			{
 				DrawCheckerBoard_RenderThread
 				(
 					RHICmdList,
 					TextureRenderTargetResource,
-					FeatureLevel
+					FeatureLevel,
+					UniformData
 				);
 			}
 	);
