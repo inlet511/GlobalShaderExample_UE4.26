@@ -157,23 +157,12 @@ static void DrawTestShaderRenderTarget_RenderThread(
 	FRHICommandListImmediate& RHICmdList,
 	FTextureRenderTargetResource* OutputRenderTargetResource,
 	ERHIFeatureLevel::Type FeatureLevel,
-	FName TextureRenderTargetName,
 	FLinearColor MyColor,
 	FRHITexture2D* MyRHITexture2D,
 	FMyShaderStructData UniformData
 )
 {
 	check(IsInRenderingThread());
-
-#if WANTS_DRAW_MESH_EVENTS  
-	FString EventName;
-	TextureRenderTargetName.ToString(EventName);
-	SCOPED_DRAW_EVENTF(RHICmdList, SceneCapture, TEXT("ShaderTest %s"), *EventName);
-#else  
-	SCOPED_DRAW_EVENT(RHICmdList, DrawUVDisplacementToRenderTarget_RenderThread);
-#endif
-
-
 
 	FRHITexture2D* RenderTargetTexture = OutputRenderTargetResource->GetRenderTargetTexture();
 	RHICmdList.Transition(FRHITransitionInfo(RenderTargetTexture, ERHIAccess::SRVMask, ERHIAccess::RTV));
@@ -212,24 +201,19 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		FRHIResourceCreateInfo createInfo;
 		FVertexBufferRHIRef MyVertexBufferRHI = RHICreateVertexBuffer(sizeof(FMyVertex) * 4, BUF_Static, createInfo);
 		void* VoidPtr = RHILockVertexBuffer(MyVertexBufferRHI, 0, sizeof(FMyVertex) * 4, RLM_WriteOnly);
-
 		FMyVertex v[4];
 		// LT
 		v[0].Position = FVector4(-1.0f, 1.0f, 0.0f, 1.0f);
 		v[0].UV = FVector2D(0, 1.0f);
-
 		// RT
 		v[1].Position = FVector4(1.0f, 1.0f, 0.0f, 1.0f);
 		v[1].UV = FVector2D(1.0f, 1.0f);
-
 		// LB
 		v[2].Position = FVector4(-1.0f, -1.0f, 0.0f, 1.0f);
 		v[2].UV = FVector2D(0.0f, 0.0f);
-
 		// RB
 		v[3].Position = FVector4(1.0f, -1.0f, 0.0f, 1.0f);
 		v[3].UV = FVector2D(1.0f, 0.0f);
-
 		FMemory::Memcpy(VoidPtr, &v, sizeof(FMyVertex) * 4);
 		RHIUnlockVertexBuffer(MyVertexBufferRHI);
 		// Vertex Buffer Ends --------------------------
@@ -239,13 +223,11 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		static const uint16 Indices[6] = {
 			0,1,2,
 			2,1,3
-		};
-		
+		};		
 		FRHIResourceCreateInfo IndexBufferCreateInfo;
 		FIndexBufferRHIRef MyIndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), sizeof(uint16)*6, BUF_Static,IndexBufferCreateInfo);
 		void* VoidPtr2 = RHILockIndexBuffer(MyIndexBufferRHI, 0, sizeof(uint16) * 6, RLM_WriteOnly);
 		FMemory::Memcpy(VoidPtr2, Indices, sizeof(uint16) * 6);
-
 		RHICmdList.SetStreamSource(0, MyVertexBufferRHI, 0);
 		RHIUnlockIndexBuffer(MyIndexBufferRHI);
 		// Index Buffer Ends-----------------------
@@ -283,12 +265,11 @@ void UTestShaderBlueprintLibrary::DrawTestShaderRenderTarget(
 	FRHITexture2D* MyRHITexture2D = MyTexture->TextureReference.TextureReferenceRHI->GetReferencedTexture()->GetTexture2D();
 
 	UWorld* World = WorldContextObject->GetWorld();
-	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
-	FName TextureRenderTargetName = OutputRenderTarget->GetFName();
+	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();	
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
-		[TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,MyRHITexture2D, UniformData](FRHICommandListImmediate& RHICmdList)
+		[TextureRenderTargetResource, FeatureLevel, MyColor,MyRHITexture2D, UniformData](FRHICommandListImmediate& RHICmdList)
 	{
-		DrawTestShaderRenderTarget_RenderThread(RHICmdList, TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor, MyRHITexture2D, UniformData);
+		DrawTestShaderRenderTarget_RenderThread(RHICmdList, TextureRenderTargetResource, FeatureLevel, MyColor, MyRHITexture2D, UniformData);
 	}
 	);
 
@@ -542,9 +523,11 @@ static void DrawCheckerBoard_RenderThread(
 
 	FTexture2DRHIRef RenderTargetTexture = TextureRenderTargetResource->GetRenderTargetTexture();
 	uint32 GGroupSize = 32;
-	FIntPoint FullResolution = FIntPoint(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY());
-	uint32 GroupSizeX = FMath::DivideAndRoundUp((uint32)RenderTargetTexture->GetSizeX(), GGroupSize);
-	uint32 GroupSizeY = FMath::DivideAndRoundUp((uint32)RenderTargetTexture->GetSizeY(), GGroupSize);
+	int32 sizeX = RenderTargetTexture->GetSizeX();
+	int32 sizeY = RenderTargetTexture->GetSizeY();
+	FIntPoint FullResolution = FIntPoint(sizeX,sizeY);
+	uint32 GroupSizeX = FMath::DivideAndRoundUp((uint32)sizeX, GGroupSize);
+	uint32 GroupSizeY = FMath::DivideAndRoundUp((uint32)sizeY, GGroupSize);
 
 	TShaderMapRef<FCheckerBoardComputeShader>ComputeShader(GetGlobalShaderMap(FeatureLevel));
 	RHICmdList.SetComputeShader(ComputeShader.GetComputeShader());
@@ -552,7 +535,7 @@ static void DrawCheckerBoard_RenderThread(
 
 	//创建一个贴图资源和UAV视图 —— 和 RenderTargetTexture无关，这里只是用到了后者尺寸
 	FRHIResourceCreateInfo CreateInfo;
-	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(RenderTargetTexture->GetSizeX(), RenderTargetTexture->GetSizeY(), PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
+	FTexture2DRHIRef GSurfaceTexture2D = RHICreateTexture2D(sizeX, sizeY, PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
 	FUnorderedAccessViewRHIRef GUAV = RHICreateUnorderedAccessView(GSurfaceTexture2D);
 
 	ComputeShader->SetParameters(RHICmdList, RenderTargetTexture, GUAV);
@@ -566,11 +549,8 @@ static void DrawCheckerBoard_RenderThread(
 	RHICmdListComputeImmediate.EndTransition(GFxToAsyncTransition);
 
 	//把CS输出的UAV贴图拷贝回RenderTargetTexture
-	/*FRHICopyTextureInfo CopyInfo;
-	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, CopyInfo);*/
+	RHICmdList.CopyTexture(GSurfaceTexture2D, RenderTargetTexture, FRHICopyTextureInfo());
 
-	// 下一个渲染函数使用上面生成的贴图
-	DrawTestShaderRenderTarget_RenderThread(RHICmdList, TextureRenderTargetResource, FeatureLevel, FName(), FColor::Red, GSurfaceTexture2D, UniformData);
 }
 
 
